@@ -193,15 +193,20 @@ $('#outBtn').onclick=()=>{S.admin=null;closeView();render();toast('로그아웃�
 
 /* ================= 이미지 ================= */
 /* 한 번만 디코딩해서 원본(긴 변 1216px)과 정사각형 썸네일(480px)을 만듦 */
-async function prepareImage(file){
+const canvasBlob=(w,h,draw,q)=>{const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'));return toBlob(c,q)};
+/* 썸네일 자르기 값: cx·cy = 정사각형 가운데(그림 폭·높이 대비 0~1), s = 확대 배율(1 = 짧은 변에 꽉 차게) */
+const defaultCrop=(w,h)=>{const side=Math.min(w,h);return{cx:.5,cy:((h-side)*.25+side/2)/h,s:1}};
+function thumbBlob(bmp,crop){
+  const W=bmp.width,H=bmp.height,c=crop||defaultCrop(W,H),side=Math.min(W,H)/c.s;
+  const sx=Math.min(W-side,Math.max(0,c.cx*W-side/2)),sy=Math.min(H-side,Math.max(0,c.cy*H-side/2)),o=480;
+  return canvasBlob(o,o,g=>{g.imageSmoothingQuality='high';g.drawImage(bmp,sx,sy,side,side,0,0,o,o)},.84);
+}
+/* 한 번만 디코딩해서 원본(긴 변 1216px)과 정사각형 썸네일(480px)을 만듦 */
+async function prepareImage(file,crop){
   const bmp=await createImageBitmap(file);
-  const out=(w,h,draw,q)=>{const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'));return toBlob(c,q)};
   try{
     const s=Math.min(1,1216/Math.max(bmp.width,bmp.height)),fw=Math.round(bmp.width*s),fh=Math.round(bmp.height*s);
-    const side=Math.min(bmp.width,bmp.height),sx=(bmp.width-side)/2,sy=(bmp.height-side)*.25,o=Math.min(480,side);
-    const [full,thumb]=await Promise.all([
-      out(fw,fh,g=>g.drawImage(bmp,0,0,fw,fh),.88),
-      out(o,o,g=>g.drawImage(bmp,sx,sy,side,side,0,0,o,o),.82)]);
+    const [full,thumb]=await Promise.all([canvasBlob(fw,fh,g=>g.drawImage(bmp,0,0,fw,fh),.88),thumbBlob(bmp,crop)]);
     return{full,thumb,ratio:+(bmp.width/bmp.height).toFixed(4)};
   }finally{bmp.close?.()}
 }
@@ -233,6 +238,57 @@ async function naiMeta(file){
     return prompt||uc||chars.length?{prompt,uc,chars}:null;
   }catch(_){return null}
 }
+
+/* ================= 썸네일 위치·확대 ================= */
+const CROP={w:0,h:0,cx:.5,cy:.5,s:1,src:'',ready:false,changed:false};
+const ZMAX=4,clampS=v=>Math.min(ZMAX,Math.max(1,v));
+function clampCrop(){
+  const side=Math.min(CROP.w,CROP.h)/CROP.s,hx=side/2/CROP.w,hy=side/2/CROP.h;
+  CROP.cx=Math.min(1-hx,Math.max(hx,CROP.cx));CROP.cy=Math.min(1-hy,Math.max(hy,CROP.cy));
+}
+function drawCrop(){
+  const box=$('#crop'),B=box.clientWidth,im=$('#cropImg');if(!CROP.ready||!B)return;
+  clampCrop();const k=B/(Math.min(CROP.w,CROP.h)/CROP.s);
+  im.style.width=CROP.w*k+'px';im.style.height=CROP.h*k+'px';
+  im.style.transform=`translate(${B/2-CROP.cx*CROP.w*k}px,${B/2-CROP.cy*CROP.h*k}px)`;
+  $('#cropZoom').value=CROP.s;$('#cropPct').textContent=Math.round(CROP.s*100)+'%';
+}
+function setCropSource(url,crop){
+  CROP.ready=false;CROP.changed=false;CROP.src=url;
+  $('#thumbSet').hidden=!url;if(!url)return;
+  const im=$('#cropImg');
+  im.onload=()=>{if(CROP.src!==url)return;CROP.w=im.naturalWidth;CROP.h=im.naturalHeight;
+    const c=crop&&crop.s>=1?crop:defaultCrop(CROP.w,CROP.h);Object.assign(CROP,{cx:+c.cx||.5,cy:+c.cy||.5,s:clampS(+c.s||1)});
+    CROP.ready=true;drawCrop()};
+  im.src=url;
+}
+const cropMoved=()=>{CROP.changed=true;S.dirty=true;drawCrop()};
+{
+  const box=$('#crop'),pts=new Map();let pinch=null;
+  const dist=()=>{const[a,b]=[...pts.values()];return Math.hypot(a.x-b.x,a.y-b.y)};
+  box.addEventListener('pointerdown',e=>{if(!CROP.ready)return;box.setPointerCapture(e.pointerId);pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pts.size===2)pinch={d:dist(),s:CROP.s};box.classList.add('grab')});
+  box.addEventListener('pointermove',e=>{
+    const p=pts.get(e.pointerId);if(!p)return;
+    if(pts.size===1){const k=box.clientWidth/(Math.min(CROP.w,CROP.h)/CROP.s);CROP.cx-=(e.clientX-p.x)/(CROP.w*k);CROP.cy-=(e.clientY-p.y)/(CROP.h*k)}
+    pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pts.size===2&&pinch)CROP.s=clampS(pinch.s*dist()/pinch.d);
+    cropMoved();
+  });
+  const up=e=>{pts.delete(e.pointerId);pinch=null;if(!pts.size)box.classList.remove('grab')};
+  box.addEventListener('pointerup',up);box.addEventListener('pointercancel',up);
+  box.addEventListener('wheel',e=>{if(!CROP.ready)return;e.preventDefault();CROP.s=clampS(CROP.s*Math.exp(-e.deltaY*.0015));cropMoved()},{passive:false});
+  box.addEventListener('keydown',e=>{
+    const d={ArrowLeft:[-.02,0],ArrowRight:[.02,0],ArrowUp:[0,-.02],ArrowDown:[0,.02]}[e.key];
+    if(d){e.preventDefault();CROP.cx+=d[0];CROP.cy+=d[1];cropMoved()}
+    else if(e.key==='+'||e.key==='='){CROP.s=clampS(CROP.s*1.1);cropMoved()}
+    else if(e.key==='-'){CROP.s=clampS(CROP.s/1.1);cropMoved()}
+  });
+  $('#cropZoom').addEventListener('input',e=>{CROP.s=clampS(+e.target.value);cropMoved()});
+  $('#cropReset').onclick=()=>{if(!CROP.ready)return;Object.assign(CROP,defaultCrop(CROP.w,CROP.h));cropMoved()};
+  addEventListener('resize',()=>{if($('#ed').open)drawCrop()});
+}
+const cropValue=()=>CROP.ready?{cx:+CROP.cx.toFixed(4),cy:+CROP.cy.toFixed(4),s:+CROP.s.toFixed(3)}:null;
 
 /* ================= 올리기 / 수정 ================= */
 const rows=()=>[...$('#fBtns').children];
@@ -270,13 +326,14 @@ function openEd(it){
   $('#fDesc').value=str(it?.memo);
   $('#fBtns').replaceChildren();
   const bs=it?buttonsOf(it):[];bs.length?bs.forEach(b=>btnRow(b.kind,b.label,b.text)):btnRow('prompt');
-  setPreview('');if(it&&(it.image||it.thumb))imgURL(str(it.image)||str(it.thumb)).then(u=>{if(S.editing===it&&!S.file)setPreview(u)},()=>{});
+  setPreview('');setCropSource('');
+  if(it&&(it.image||it.thumb))imgURL(str(it.image)||str(it.thumb)).then(u=>{if(S.editing===it&&!S.file){setPreview(u);setCropSource(u,it.crop)}},()=>{});
   $('#edMsg').textContent='';$('#file').value='';$('#edSave').disabled=false;
-  S.dirty=false;closeView();$('#ed').showModal();
+  S.dirty=false;closeView();$('#ed').showModal();drawCrop();
 }
 async function pick(f){
   if(!f||!f.type.startsWith('image/')){if(f)$('#edMsg').textContent='이미지 파일만 올릴 수 있어요.';return}
-  S.file=f;S.dirty=true;previewURL=URL.createObjectURL(f);setPreview(previewURL);
+  S.file=f;S.dirty=true;previewURL=URL.createObjectURL(f);setPreview(previewURL);setCropSource(previewURL);
   if(!$('#fName').value.trim()&&f.name&&!/^image\.\w+$/.test(f.name))$('#fName').value=f.name.replace(/\.[^.]+$/,'');
   const m=await naiMeta(f);
   if(!m){$('#edMsg').textContent='';return}
@@ -310,15 +367,25 @@ $('#edf').addEventListener('submit',async e=>{
   b.disabled=true;
   const id=old?.id||newId(),now=Date.now();
   const item={id,name:$('#fName').value.trim(),category:$('#fCat').value,memo:$('#fDesc').value.trim(),buttons,
-    image:old?.image||'',thumb:old?.thumb||'',ratio:old?.ratio,createdAt:old?.createdAt||now,updatedAt:now};
+    image:old?.image||'',thumb:old?.thumb||'',ratio:old?.ratio,crop:cropValue()||old?.crop,createdAt:old?.createdAt||now,updatedAt:now};
   const files={},remove=[];
+  const pack=async b=>LOCK.on?new Blob([await encBytes(new Uint8Array(await b.arrayBuffer()))]):b;
   try{
+    if(!S.file&&old&&CROP.changed&&CROP.ready){
+      /* 그림은 그대로, 썸네일만 새 위치·확대로 다시 만듦 */
+      m.textContent='썸네일을 만드는 중…';
+      const bmp=await createImageBitmap(await (await fetch(CROP.src)).blob());
+      let th;try{th=await thumbBlob(bmp,item.crop)}finally{bmp.close?.()}
+      const ext=LOCK.on?'bin':th.type==='image/webp'?'webp':'jpg';
+      item.thumb=`thumbs/${id}-${now.toString(36)}.${ext}`;
+      files[item.thumb]=await pack(th);S.local[item.thumb]=URL.createObjectURL(th);
+      if(isRepoFile(old.thumb))remove.push(old.thumb);
+    }
     if(S.file){
       m.textContent='이미지를 줄이는 중…';
-      const img=await prepareImage(S.file);
+      const img=await prepareImage(S.file,item.crop);
       const ext=LOCK.on?'bin':img.full.type==='image/webp'?'webp':'jpg',stamp=now.toString(36);
       item.image=`images/${id}-${stamp}.${ext}`;item.thumb=`thumbs/${id}-${stamp}.${ext}`;item.ratio=img.ratio;
-      const pack=async b=>LOCK.on?new Blob([await encBytes(new Uint8Array(await b.arrayBuffer()))]):b;
       files[item.image]=await pack(img.full);files[item.thumb]=await pack(img.thumb);
       if(old)remove.push(...[old.image,old.thumb].filter(isRepoFile));
       S.local[item.image]=URL.createObjectURL(img.full);S.local[item.thumb]=URL.createObjectURL(img.thumb);
@@ -428,6 +495,17 @@ textarea.plain{font:14.5px/1.6 var(--mono)}
 .drop img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:var(--soft)}
 .drop .chg{position:absolute;right:8px;bottom:8px;z-index:1;background:var(--ink);color:var(--inv);font-size:12px;padding:4px 10px}
 .drop.over{border-color:var(--ink);color:var(--ink)}
+.thumbset{display:grid;gap:10px}
+.thumbset>.t{font-size:13px;font-weight:600;color:var(--mute)}
+.cropwrap{display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap}
+.crop{width:min(240px,100%);aspect-ratio:1/1;position:relative;overflow:hidden;background:var(--soft);outline:1px solid var(--ink);outline-offset:3px;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.crop.grab{cursor:grabbing}
+.crop:focus-visible{outline:2px solid var(--ink)}
+.crop img{position:absolute;left:0;top:0;max-width:none;pointer-events:none;-webkit-user-drag:none}
+.cropctl{flex:1 1 160px;display:grid;gap:12px;align-content:end}
+.cropctl label{grid-template-columns:auto 1fr;align-items:center}
+.cropctl label input{grid-column:1/-1}
+input[type=range]{width:100%;accent-color:var(--ink);height:28px}
 .bsec{display:grid;gap:10px}
 .bsec>.t{font-size:13px;font-weight:600;color:var(--mute)}
 .brow{border:1.5px solid var(--line);display:grid}
@@ -468,6 +546,17 @@ const AHTML=`<!-- 올리기 / 수정 -->
   <form id="edf" novalidate>
     <h2 id="edH">올리기</h2>
     <div class="drop" id="drop" tabindex="0" role="button" aria-label="썸네일 이미지 선택">썸네일 이미지를 끌어다 놓거나, 눌러서 선택하거나, Ctrl+V로 붙여넣기<br>NAI에서 받은 PNG면 복사 버튼이 자동으로 채워져요<input type="file" id="file" accept="image/*" hidden></div>
+    <div class="thumbset" id="thumbSet" hidden>
+      <div class="t">미리보기 썸네일 <span class="sub">· 갤러리에 보이는 부분이에요. 큰 그림은 그대로예요</span></div>
+      <div class="cropwrap">
+        <div class="crop" id="crop" tabindex="0" role="application" aria-label="썸네일 위치. 끌거나 화살표 키로 옮기고, 휠이나 +, - 키로 확대"><img id="cropImg" alt="" draggable="false"></div>
+        <div class="cropctl">
+          <p class="hint">끌어서 위치 조정<br>휠 · 두 손가락 · 슬라이더로 확대</p>
+          <label>확대 <span class="sub" id="cropPct">100%</span><input type="range" id="cropZoom" min="1" max="4" step="0.01" value="1"></label>
+          <button type="button" class="btn line" id="cropReset">처음대로</button>
+        </div>
+      </div>
+    </div>
     <label>이름<input type="text" id="fName" maxlength="80"></label>
     <label>카테고리<select id="fCat"></select></label>
     <label>설명 <span class="sub">· 복사 창에 보이는 글이에요. 비워 두면 안 보여요</span><textarea id="fDesc" class="plain" rows="4" maxlength="2000" placeholder="사용 팁, 추천 설정, 주의할 점 등"></textarea></label>
