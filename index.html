@@ -25,6 +25,17 @@ button,input,textarea,select{font:inherit;color:inherit}
 h1{margin:0;font-size:clamp(26px,3.4vw,34px);font-weight:700;letter-spacing:-.025em;line-height:1.15}
 .desc{margin:8px 0 0;color:var(--mute);font-size:15px;white-space:pre-line;max-width:60ch}
 .abar{display:flex;gap:8px;flex-wrap:wrap}
+/* 순서 바꾸기 모드 */
+.grid.sorting .card{cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.grid.sorting{margin-bottom:64px}
+.grid.sorting .ph{outline:1px dashed var(--mute);outline-offset:3px}
+.grid.sorting .card:hover .ph img{transform:none}
+.grid .sortable-ghost{opacity:.25}
+.sortable-fallback{opacity:.9!important;cursor:grabbing}
+.sortbar{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:15;display:flex;align-items:center;gap:8px;background:var(--ink);color:var(--inv);border-radius:999px;padding:6px 6px 6px 20px;box-shadow:0 10px 30px -10px rgba(0,0,0,.5);max-width:94vw;font-size:14px;white-space:nowrap}
+.sortbar .btn{border-color:color-mix(in srgb,var(--inv) 35%,transparent);color:var(--inv)}
+.sortbar .btn.fill{background:var(--inv);color:var(--ink);border-color:var(--inv)}
+@media(max-width:420px){.sortbar .hint2{display:none}.sortbar{padding-left:6px}}
 
 /* 버튼 */
 .btn{height:40px;padding:0 16px;border:1px solid var(--ink);background:transparent;border-radius:999px;cursor:pointer;font-size:14px;font-weight:600;white-space:nowrap}
@@ -124,6 +135,17 @@ textarea.plain{font:15px/1.55 var(--sans)}
 .row{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 hr{border:0;border-top:1px solid var(--line);margin:4px 0}
 
+/* 사이트 잠금 화면 — 잠겨 있는 동안 본문은 아예 그리지 않음 */
+body.locked>header,body.locked>main{display:none}
+#lock{position:fixed;inset:0;background:var(--bg);z-index:25;display:grid;place-items:center;padding:20px}
+.lbox{width:min(340px,100%);display:grid;gap:14px;text-align:center}
+.lbox svg{width:28px;height:28px;justify-self:center;color:var(--ink)}
+.lbox h2{margin:0;font-size:20px;font-weight:700;letter-spacing:-.02em}
+.lbox input{text-align:center;font-size:20px;letter-spacing:.3em;padding:12px}
+.lbox input::placeholder{letter-spacing:normal;font-size:15px}
+.lbox .hint{line-height:1.6;white-space:pre-line}
+.lbox .notice{margin:0;font-size:12.5px;color:var(--mute);border-top:1px solid var(--line);padding-top:14px;white-space:pre-line;line-height:1.6}
+
 /* 숨겨진 로그인 */
 #gate{position:fixed;inset:0;background:var(--bg);z-index:20;display:grid;place-items:center;padding:20px}
 .gbox{width:min(360px,100%);display:grid;gap:14px}
@@ -135,7 +157,7 @@ hr{border:0;border-top:1px solid var(--line);margin:4px 0}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
-<body>
+<body class="locked">
 
 <header class="top">
   <div>
@@ -144,6 +166,7 @@ hr{border:0;border-top:1px solid var(--line);margin:4px 0}
   </div>
   <div class="abar" id="abar" hidden>
     <button class="btn fill" id="addBtn">+ 올리기</button>
+    <button class="btn line" id="sortBtn">순서 바꾸기</button>
     <button class="btn line" id="setBtn">설정</button>
     <button class="btn line" id="outBtn">로그아웃</button>
   </div>
@@ -208,6 +231,15 @@ hr{border:0;border-top:1px solid var(--line);margin:4px 0}
     <label>카테고리 순서 <span class="sub">· 한 줄에 하나씩, 위에서부터 탭에 보이는 순서예요</span><textarea id="sCats" class="plain" rows="5"></textarea></label>
     <div class="row"><button class="btn fill" id="sSave">저장</button></div>
     <hr>
+    <div id="lockSet" class="bsec" style="gap:16px" hidden>
+      <h3>사이트 비밀번호</h3>
+      <label>새 비밀번호 <span class="sub">· 바꾸지 않으려면 비워 두세요</span><input type="password" id="pNew" autocomplete="new-password"></label>
+      <label>새 비밀번호 확인<input type="password" id="pNew2" autocomplete="new-password"></label>
+      <label>힌트 <span class="sub">· 잠금 화면에 보여요</span><input type="text" id="pHint" maxlength="100"></label>
+      <label>안내 문구 <span class="sub">· 잠금 화면 아래에 작게 보여요</span><textarea id="pNotice" class="plain" rows="2" maxlength="300"></textarea></label>
+      <div class="row"><button class="btn line" id="pSave">잠금 설정 저장</button></div>
+      <hr>
+    </div>
     <h3>관리자 코드 바꾸기</h3>
     <label>새 코드<input type="password" id="cNew" autocomplete="new-password"></label>
     <label>새 코드 확인<input type="password" id="cNew2" autocomplete="new-password"></label>
@@ -215,6 +247,19 @@ hr{border:0;border-top:1px solid var(--line);margin:4px 0}
     <p class="msg" id="sMsg" role="status"></p>
   </div>
 </dialog>
+
+<!-- 사이트 잠금 -->
+<section id="lock" hidden>
+  <form class="lbox" id="lockForm" novalidate>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="1.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>
+    <h2>비밀번호를 입력해 주세요</h2>
+    <input type="password" id="lockPw" autocomplete="current-password" aria-label="비밀번호" placeholder="비밀번호">
+    <button class="btn fill wide" id="lockBtn">열기</button>
+    <p class="msg" id="lockMsg" role="status"></p>
+    <p class="hint" id="lockHint" hidden></p>
+    <p class="notice" id="lockNotice" hidden></p>
+  </form>
+</section>
 
 <!-- 숨겨진 로그인 (#admin) -->
 <section id="gate" hidden>
@@ -240,6 +285,12 @@ hr{border:0;border-top:1px solid var(--line);margin:4px 0}
   </form>
 </section>
 
+<div class="sortbar" id="sortbar" hidden>
+  <span class="hint2">끌어서 순서를 바꾸세요</span>
+  <button class="btn" id="sortCancel">취소</button>
+  <button class="btn fill" id="sortSave">순서 저장</button>
+</div>
+
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -262,7 +313,8 @@ const S={
   meta:null,         // admin.json
   local:{},          // 방금 올린 이미지 미리보기 (경로 → blob URL)
   viewing:null,vr:1, // 보기 창 항목, 사진 비율
-  editing:null,file:null,dirty:false
+  editing:null,file:null,dirty:false,
+  work:null          // 순서 바꾸기 중인 목록 (저장 전)
 };
 
 let toastT;
@@ -270,7 +322,6 @@ function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clea
 
 /* 데이터에서 온 이미지 경로는 저장소 안 폴더나 https만 허용 */
 const safeSrc=p=>{p=str(p);return /^(images|thumbs)\/[\w.-]+$/.test(p)||/^https:\/\//.test(p)?p:''};
-const srcOf=p=>S.local[p]||safeSrc(p);
 const isRepoFile=p=>/^(images|thumbs)\/[\w.-]+$/.test(str(p));
 
 const SVG={copy:'<rect x="5.5" y="5.5" width="8" height="8" rx="1"/><path d="M10.5 3.5v-.5a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h.5"/>',check:'<path d="M3 8.5l3.2 3L13 4.5"/>'};
@@ -292,6 +343,68 @@ async function copyText(text){
   document.body.append(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(_){}ta.remove();return ok;
 }
 
+/* ================= 사이트 잠금 =================
+  lock.json        : 비밀번호로 감싼 내용 키 (+ 힌트·안내 문구)
+  prompts.enc.json : 내용 키로 암호화한 목록
+  images/*.bin     : 내용 키로 암호화한 이미지 ([iv 12바이트][암호문])
+  비밀번호 없이는 목록·이미지를 풀 수 없음. 해제한 키는 이 탭에서만 기억(sessionStorage). */
+const LOCK={on:false,meta:null,key:null,raw:null};
+const LOCK_ITER=600000,SKEY='prompts-unlock';
+const rnd=n=>crypto.getRandomValues(new Uint8Array(n));
+const importKey=raw=>crypto.subtle.importKey('raw',raw,'AES-GCM',false,['encrypt','decrypt']);
+async function encBytes(u8){const iv=rnd(12),ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},LOCK.key,u8));const o=new Uint8Array(12+ct.length);o.set(iv);o.set(ct,12);return o}
+async function decBytes(u8){return new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:u8.subarray(0,12)},LOCK.key,u8.subarray(12)))}
+async function encJson(obj){const iv=rnd(12),ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},LOCK.key,enc.encode(JSON.stringify(obj))));return JSON.stringify({v:1,iv:b64(iv),data:b64(ct)})+'\n'}
+async function decJson(text){const o=JSON.parse(text);return JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(o.iv)},LOCK.key,unb64(o.data))))}
+async function wrapKey(pw,raw){const salt=rnd(16),iv=rnd(12),kek=await keyFrom(pw,salt,LOCK_ITER);return{salt:b64(salt),iter:LOCK_ITER,iv:b64(iv),data:b64(new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},kek,raw)))}}
+async function unlockWith(pw){
+  const w=LOCK.meta.wrap,kek=await keyFrom(pw,unb64(w.salt),Number(w.iter)||LOCK_ITER);
+  const raw=new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(w.iv)},kek,unb64(w.data)));
+  await setKey(raw);
+}
+async function setKey(raw){LOCK.raw=raw;LOCK.key=await importKey(raw);try{sessionStorage.setItem(SKEY,b64(raw))}catch(_){}}
+function forgetKey(){LOCK.key=LOCK.raw=null;try{sessionStorage.removeItem(SKEY)}catch(_){}}
+const sniff=u=>u[0]===0xFF&&u[1]===0xD8?'image/jpeg':u[0]===0x89&&u[1]===0x50?'image/png':'image/webp';
+/* 경로 → 화면에 쓸 주소. .bin이면 받아서 복호화한 blob 주소 */
+const imgCache=new Map();
+function imgURL(p){
+  p=str(p);
+  if(S.local[p])return Promise.resolve(S.local[p]);
+  if(/\.bin$/.test(p)&&isRepoFile(p)){
+    if(!LOCK.key)return Promise.reject();
+    if(!imgCache.has(p))imgCache.set(p,(async()=>{
+      const r=await fetch(p);if(!r.ok)throw 0;
+      const u=await decBytes(new Uint8Array(await r.arrayBuffer()));
+      return URL.createObjectURL(new Blob([u],{type:sniff(u)}));
+    })().catch(e=>{imgCache.delete(p);throw e}));
+    return imgCache.get(p);
+  }
+  const u=safeSrc(p);return u?Promise.resolve(u):Promise.reject();
+}
+function showLock(){
+  document.body.classList.add('locked');$('#lock').hidden=false;
+  const m=LOCK.meta,h=str(m.hint).trim(),n=str(m.notice).trim();
+  $('#lockHint').textContent=h?'힌트: '+h:'';$('#lockHint').hidden=!h;
+  $('#lockNotice').textContent=n;$('#lockNotice').hidden=!n;
+  $('#lockMsg').textContent='';$('#lockPw').value='';$('#lockPw').focus();
+}
+$('#lockForm').addEventListener('submit',async e=>{
+  e.preventDefault();const pw=$('#lockPw').value,b=$('#lockBtn'),m=$('#lockMsg');
+  if(!pw)return;b.disabled=true;m.textContent='여는 중…';
+  try{await unlockWith(pw)}catch(_){m.textContent='비밀번호가 맞지 않아요.';$('#lockPw').select();b.disabled=false;return}
+  try{await loadLocked()}catch(_){forgetKey();m.textContent='목록을 열지 못했어요. 잠시 뒤 다시 시도해 주세요.';b.disabled=false;return}
+  b.disabled=false;$('#lock').hidden=true;document.body.classList.remove('locked');render();route();
+});
+async function loadLocked(){
+  const r=await fetch('prompts.enc.json?v='+Date.now(),{cache:'no-store'});
+  if(r.status===404){   // 아직 암호화 전(관리자가 처음 들어오면 자동 변환)
+    const o=await fetch('prompts.json?v='+Date.now(),{cache:'no-store'}).catch(()=>null);
+    S.site=normalize(o?.ok?await o.json():null);S.loadError=false;return;
+  }
+  if(!r.ok)throw 0;
+  S.site=normalize(await decJson(await r.text()));S.loadError=false;
+}
+
 /* ================= 데이터 ================= */
 function normalize(d){
   d=d&&typeof d==='object'?d:{};
@@ -300,9 +413,18 @@ function normalize(d){
   const categories=[...new Set((Array.isArray(d.categories)?d.categories:[]).filter(c=>typeof c==='string').map(c=>c.trim()).filter(Boolean))];
   return{title:str(d.title),description:str(d.description),categories,items};
 }
-async function loadPublic(){
+/* 열 수 있으면 true, 비밀번호가 필요하면 false */
+async function loadSite(){
+  try{const r=await fetch('lock.json?v='+Date.now(),{cache:'no-store'});LOCK.meta=r.ok?await r.json():null}catch(_){LOCK.meta=null}
+  LOCK.on=!!LOCK.meta?.wrap;
+  if(LOCK.on){
+    let saved=null;try{saved=sessionStorage.getItem(SKEY)}catch(_){}
+    if(!saved)return false;
+    try{await setKey(unb64(saved));await loadLocked();return true}catch(_){forgetKey();return false}
+  }
   try{const r=await fetch('prompts.json?v='+Date.now(),{cache:'no-store'});if(!r.ok)throw 0;S.site=normalize(await r.json());S.loadError=false}
   catch(_){S.site=normalize(null);S.loadError=true}
+  return true;
 }
 const catOf=it=>str(it.category).trim()||'기타';
 function catList(){
@@ -323,16 +445,19 @@ function buttonsOf(it){
 const visibleItems=()=>S.site.items.filter(it=>!S.cat||catOf(it)===S.cat);
 
 /* ================= 갤러리 ================= */
-function thumbImg(src){
-  const im=el('img');im.alt='';im.loading='lazy';im.decoding='async';
-  im.onload=()=>im.classList.add('ld');
-  im.onerror=()=>im.replaceWith(el('span','noimg','NO IMAGE'));
-  im.src=src;return im;
+/* 썸네일은 화면 근처에 왔을 때 불러옴 (잠금 사이트면 그때 복호화) */
+const io=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting){io.unobserve(e.target);fillThumb(e.target)}},{rootMargin:'600px 0px'});
+function fillThumb(ph){
+  const noimg=()=>ph.replaceChildren(el('span','noimg','NO IMAGE'));
+  imgURL(ph.dataset.src).then(u=>{
+    const im=el('img');im.alt='';im.decoding='async';im.draggable=false;
+    im.onload=()=>im.classList.add('ld');im.onerror=noimg;im.src=u;ph.replaceChildren(im);
+  },noimg);
 }
 function card(it){
   const b=el('button','card');b.type='button';b.dataset.id=it.id;
-  const ph=el('div','ph'),src=srcOf(it.thumb)||srcOf(it.image);
-  ph.append(src?thumbImg(src):el('span','noimg','NO IMAGE'));
+  const ph=el('div','ph'),src=str(it.thumb)||str(it.image);
+  if(src){ph.dataset.src=src;io.observe(ph)}else ph.append(el('span','noimg','NO IMAGE'));
   b.append(ph,el('div','nm',str(it.name)||'이름 없음'));
   return b;
 }
@@ -341,9 +466,10 @@ function render(){
   const s=S.site,t=s.title||DEFAULT_TITLE;
   $('#siteTitle').textContent=t;document.title=t;
   $('#siteDesc').textContent=s.description;$('#siteDesc').hidden=!s.description;
-  $('#abar').hidden=!S.admin;
+  $('#abar').hidden=!S.admin||!!S.work;$('#sortbar').hidden=!S.work;
   if(S.viewing)S.viewing=s.items.find(x=>x.id===S.viewing.id)||S.viewing;   // 저장 후 최신 항목으로
-  $('#grid').replaceChildren(...s.items.map(card));
+  $('#grid').replaceChildren(...(S.work||s.items).map(card));
+  $('#grid').classList.toggle('sorting',!!S.work);
   renderTabs();
 }
 function renderTabs(){
@@ -366,7 +492,46 @@ function applyFilter(){
     :S.admin?'아직 올린 프롬프트가 없어요. “+ 올리기”로 시작해 보세요.':'아직 올라온 프롬프트가 없어요.';
 }
 $('#cats').addEventListener('click',e=>{const b=e.target.closest('.tab');if(b){S.cat=b.dataset.cat;applyFilter()}});
-$('#grid').addEventListener('click',e=>{const c=e.target.closest('.card');if(c)location.hash='p-'+c.dataset.id});
+$('#grid').addEventListener('click',e=>{if(S.work)return;const c=e.target.closest('.card');if(c)location.hash='p-'+c.dataset.id});
+
+/* ================= 순서 바꾸기 (관리자) ================= */
+/* 드래그 라이브러리는 관리자가 처음 누를 때만 불러옴 — 방문자는 안 받음 */
+let sortLib=null,sorter=null;
+function loadSortable(){
+  return sortLib||=new Promise((ok,fail)=>{
+    const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js';
+    sc.onload=()=>ok(window.Sortable);sc.onerror=()=>{sortLib=null;fail()};document.head.append(sc);
+  });
+}
+/* 탭으로 일부만 보일 때: 보이는 카드끼리만 자리를 바꾸고, 안 보이는 카드는 제자리 */
+function syncWork(){
+  const g=$('#grid'),nodes=new Map([...g.children].filter(c=>c.dataset.id).map(c=>[c.dataset.id,c]));
+  const vis=[...nodes.values()].filter(c=>!c.hidden).map(c=>c.dataset.id);
+  const byId=new Map(S.work.map(x=>[x.id,x])),shown=it=>!S.cat||catOf(it)===S.cat;
+  const next=S.work.slice();let k=0;
+  S.work.forEach((it,i)=>{if(shown(it))next[i]=byId.get(vis[k++])});
+  S.work=next;g.append(...S.work.map(it=>nodes.get(it.id)));
+}
+$('#sortBtn').onclick=async e=>{
+  const b=e.currentTarget;b.disabled=true;let Sortable;
+  try{Sortable=await loadSortable()}catch(_){toast('드래그 기능을 불러오지 못했어요. 인터넷 연결을 확인해 주세요.');b.disabled=false;return}
+  b.disabled=false;S.work=S.site.items.slice();render();
+  sorter=Sortable.create($('#grid'),{animation:180,draggable:'.card:not([hidden])',forceFallback:true,fallbackOnBody:true,fallbackTolerance:4,
+    delay:160,delayOnTouchOnly:true,ghostClass:'sortable-ghost',onEnd:syncWork});
+};
+function endSort(){sorter?.destroy();sorter=null;S.work=null;render()}
+$('#sortCancel').onclick=endSort;
+$('#sortSave').onclick=async e=>{
+  const b=e.currentTarget,order=new Map(S.work.map((it,i)=>[it.id,i]));
+  const same=S.work.every((it,i)=>S.site.items[i]?.id===it.id);
+  if(same){endSort();return}
+  b.disabled=true;b.textContent='저장 중…';
+  try{
+    await commit({message:'Reorder',mutate:d=>{d.items.sort((x,y)=>(order.get(x.id)??1e9)-(order.get(y.id)??1e9));return d}});
+    endSort();toast('순서를 저장했어요 · 사이트 반영까지 1~2분');
+  }catch(err){toast(ghErr(err))}
+  b.disabled=false;b.textContent='순서 저장';
+};
 
 /* ================= 보기 창 ================= */
 /* 세로·정사각형은 사진 왼쪽, 가로는 사진 위 — 창 크기를 사진 비율에 맞춤 */
@@ -398,8 +563,13 @@ function copyRow(label,text){
 function openView(id){
   const it=S.site.items.find(x=>x.id===id);if(!it){closeView();return}
   S.viewing=it;S.vr=Number(it.ratio)>0?Number(it.ratio):1;
-  const vi=$('#vImg'),src=srcOf(it.image)||srcOf(it.thumb);
-  if(src){const im=el('img');im.alt=str(it.name);im.onload=()=>{if(S.viewing===it&&im.naturalHeight){S.vr=im.naturalWidth/im.naturalHeight;layoutView()}};im.src=src;vi.replaceChildren(im)}
+  const vi=$('#vImg'),src=str(it.image)||str(it.thumb);vi.replaceChildren();
+  if(src)imgURL(src).then(u=>{
+    if(S.viewing?.id!==it.id)return;
+    const im=el('img');im.alt=str(it.name);
+    im.onload=()=>{if(S.viewing?.id===it.id&&im.naturalHeight){S.vr=im.naturalWidth/im.naturalHeight;layoutView()}};
+    im.src=u;vi.replaceChildren(im);
+  },()=>{if(S.viewing?.id===it.id)vi.replaceChildren(el('span','noimg','NO IMAGE'))});
   else vi.replaceChildren(el('span','noimg','NO IMAGE'));
   const cat=str(it.category).trim(),desc=str(it.memo).trim();
   $('#vCat').textContent=cat;$('#vCat').hidden=!cat;
@@ -437,6 +607,7 @@ $('#ed').addEventListener('input',()=>{S.dirty=true});
 
 /* ================= 라우팅 ================= */
 function route(){
+  if(LOCK.on&&!LOCK.key)return;   // 잠금 해제 전에는 아무것도 열지 않음
   const h=location.hash;
   if(h==='#admin'){if(S.admin)history.replaceState(null,'',location.pathname);else showGate();return}
   $('#gate').hidden=true;
@@ -468,13 +639,17 @@ async function api(path,{method='GET',body,raw=false}={}){
     headers:{Authorization:'Bearer '+a.token,Accept:raw?'application/vnd.github.raw+json':'application/vnd.github+json'},
     body:body?JSON.stringify(body):undefined});
   if(!r.ok){const e=new Error('GitHub '+r.status);e.status=r.status;throw e}
-  return raw?r.text():r.status===204?null:r.json();
+  return raw==='bin'?r.arrayBuffer():raw?r.text():r.status===204?null:r.json();
 }
 const refPath=()=>'git/ref/heads/'+S.admin.branch.split('/').map(encodeURIComponent).join('/');
 const headSha=async()=>(await api(refPath())).object.sha;
 async function readAt(path,ref){try{return await api(`contents/${path}?ref=${encodeURIComponent(ref)}`,{raw:true})}catch(e){if(e.status===404)return null;throw e}}
 async function exists(path,ref){try{await api(`contents/${path}?ref=${encodeURIComponent(ref)}`);return true}catch(e){if(e.status===404)return false;throw e}}
-const readSite=async ref=>{const t=await readAt('prompts.json',ref);return normalize(t!=null?JSON.parse(t):structuredClone(S.site))};
+async function readSite(ref){
+  if(LOCK.on){const t=await readAt('prompts.enc.json',ref);if(t!=null)return normalize(await decJson(t))}
+  const t=await readAt('prompts.json',ref);   // 잠금 전 형식
+  return normalize(t!=null?JSON.parse(t):structuredClone(S.site));
+}
 /*
   files:  {경로: Blob|문자열}  올릴 파일
   remove: [경로]              지울 파일 (없으면 건너뜀)
@@ -491,8 +666,13 @@ async function commit({files={},remove=[],mutate,message}){
   for(let attempt=0;;attempt++){
     const head=await headSha(),base=(await api('git/commits/'+head)).tree.sha;
     const tree=blobs.slice();let next=null;
-    for(const p of remove)if(await exists(p,head))tree.push({path:p,mode:'100644',type:'blob',sha:null});
-    if(mutate){next=mutate(await readSite(head));tree.push({path:'prompts.json',mode:'100644',type:'blob',content:JSON.stringify(next,null,2)+'\n'})}
+    const rm=mutate&&LOCK.on?[...remove,'prompts.json']:remove;   // 잠금 사이트엔 평문 목록을 남기지 않음
+    for(const p of rm)if(await exists(p,head))tree.push({path:p,mode:'100644',type:'blob',sha:null});
+    if(mutate){
+      next=mutate(await readSite(head));
+      tree.push(LOCK.on?{path:'prompts.enc.json',mode:'100644',type:'blob',content:await encJson(next)}
+                       :{path:'prompts.json',mode:'100644',type:'blob',content:JSON.stringify(next,null,2)+'\n'});
+    }
     if(!tree.length)return;
     const t=await api('git/trees',{method:'POST',body:{base_tree:base,tree}});
     const c=await api('git/commits',{method:'POST',body:{message,tree:t.sha,parents:[head]}});
@@ -526,6 +706,24 @@ async function enterAdmin(a){
   S.admin=a;$('#gate').hidden=true;history.replaceState(null,'',location.pathname);
   try{S.site=await readSite(a.branch);S.loadError=false}catch(_){}   // 사이트 반영 전 최신 목록
   render();toast('관리자 모드');
+  if(LOCK.on)migrate().catch(err=>toast('기존 데이터 암호화 실패: '+ghErr(err)));
+}
+/* 잠금 전에 올린 평문 목록·이미지가 있으면 암호화해서 바꿔치기 (커밋 1개) */
+async function migrate(){
+  const head=await headSha(),site=await readSite(head),plainList=await exists('prompts.json',head);
+  const paths=[...new Set(site.items.flatMap(it=>[it.image,it.thumb]).filter(p=>isRepoFile(p)&&!/\.bin$/.test(p)))];
+  if(!plainList&&!paths.length)return;
+  toast('기존 데이터를 암호화하는 중…');
+  const files={},remove=[],map={};
+  for(const p of paths){
+    try{
+      const u=new Uint8Array(await api(`contents/${p}?ref=${head}`,{raw:'bin'}));
+      const np=p.replace(/\.[^./]+$/,'')+'.bin';files[np]=new Blob([await encBytes(u)]);remove.push(p);map[p]=np;
+      S.local[np]=URL.createObjectURL(new Blob([u],{type:sniff(u)}));
+    }catch(e){if(e.status!==404)throw e;map[p]=''}
+  }
+  await commit({files,remove,message:'Encrypt existing data',mutate:d=>{for(const it of d.items)for(const f of['image','thumb'])if(map[it[f]]!==undefined)it[f]=map[it[f]];return d}});
+  toast('기존 데이터를 암호화했어요');
 }
 $('#login').addEventListener('submit',async e=>{
   e.preventDefault();const code=$('#code').value,b=$('#loginBtn'),m=$('#gMsg');
@@ -633,7 +831,7 @@ function openEd(it){
   $('#fDesc').value=str(it?.memo);
   $('#fBtns').replaceChildren();
   const bs=it?buttonsOf(it):[];bs.length?bs.forEach(b=>btnRow(b.kind,b.label,b.text)):btnRow('prompt');
-  setPreview(it?srcOf(it.image)||srcOf(it.thumb):'');
+  setPreview('');if(it&&(it.image||it.thumb))imgURL(str(it.image)||str(it.thumb)).then(u=>{if(S.editing===it&&!S.file)setPreview(u)},()=>{});
   $('#edMsg').textContent='';$('#file').value='';$('#edSave').disabled=false;
   S.dirty=false;closeView();$('#ed').showModal();
 }
@@ -679,16 +877,17 @@ $('#edf').addEventListener('submit',async e=>{
     if(S.file){
       m.textContent='이미지를 줄이는 중…';
       const img=await prepareImage(S.file);
-      const ext=img.full.type==='image/webp'?'webp':'jpg',stamp=now.toString(36);
+      const ext=LOCK.on?'bin':img.full.type==='image/webp'?'webp':'jpg',stamp=now.toString(36);
       item.image=`images/${id}-${stamp}.${ext}`;item.thumb=`thumbs/${id}-${stamp}.${ext}`;item.ratio=img.ratio;
-      files[item.image]=img.full;files[item.thumb]=img.thumb;
+      const pack=async b=>LOCK.on?new Blob([await encBytes(new Uint8Array(await b.arrayBuffer()))]):b;
+      files[item.image]=await pack(img.full);files[item.thumb]=await pack(img.thumb);
       if(old)remove.push(...[old.image,old.thumb].filter(isRepoFile));
       S.local[item.image]=URL.createObjectURL(img.full);S.local[item.thumb]=URL.createObjectURL(img.thumb);
     }
     m.textContent='저장하는 중…';
     await commit({files,remove,message:(old?'Update: ':'Add: ')+(item.name||id),mutate:d=>{
       const i=d.items.findIndex(x=>x.id===id);
-      if(i>=0)d.items[i]=item;else d.items.unshift(item);
+      if(i>=0)d.items[i]=item;else d.items.push(item);   // 새 항목은 맨 뒤
       if(item.category&&!d.categories.includes(item.category))d.categories.push(item.category);
       return d;
     }});
@@ -719,6 +918,8 @@ $('#vDel').onclick=async e=>{
 $('#setBtn').onclick=()=>{
   $('#sTitle').value=S.site.title;$('#sDesc').value=S.site.description;$('#sCats').value=S.site.categories.join('\n');
   $('#sMsg').textContent='';$('#cNew').value='';$('#cNew2').value='';
+  $('#lockSet').hidden=!LOCK.on;
+  if(LOCK.on){$('#pNew').value='';$('#pNew2').value='';$('#pHint').value=str(LOCK.meta.hint);$('#pNotice').value=str(LOCK.meta.notice)}
   $('#set').showModal();
 };
 $('#sSave').onclick=async e=>{
@@ -726,6 +927,19 @@ $('#sSave').onclick=async e=>{
   const title=$('#sTitle').value.trim(),desc=$('#sDesc').value.trim(),cats=[...new Set($('#sCats').value.split('\n').map(x=>x.trim()).filter(Boolean))];
   try{await commit({message:'Update site info',mutate:d=>Object.assign(d,{title,description:desc,categories:cats})});m.textContent='저장했어요.'}
   catch(err){m.textContent=ghErr(err)}
+  b.disabled=false;
+};
+$('#pSave').onclick=async e=>{
+  const pw=$('#pNew').value,m=$('#sMsg'),b=e.currentTarget;
+  if(pw&&pw!==$('#pNew2').value){m.textContent='비밀번호 확인이 일치하지 않아요.';return}
+  b.disabled=true;m.textContent='저장하는 중…';
+  try{
+    const meta={...LOCK.meta,hint:$('#pHint').value.trim(),notice:$('#pNotice').value.trim()};
+    if(pw)meta.wrap=await wrapKey(pw,LOCK.raw);   // 내용 키는 그대로, 감싸는 비밀번호만 바뀜
+    await commit({files:{'lock.json':JSON.stringify(meta,null,2)+'\n'},message:pw?'Change site password':'Update lock text'});
+    LOCK.meta=meta;$('#pNew').value='';$('#pNew2').value='';
+    m.textContent=pw?'비밀번호를 바꿨어요. 1~2분 뒤부터 새 비밀번호로 열려요.':'저장했어요.';
+  }catch(err){m.textContent=ghErr(err)}
   b.disabled=false;
 };
 $('#cSave').onclick=async e=>{
@@ -743,7 +957,7 @@ $('#cSave').onclick=async e=>{
 };
 
 /* ================= 시작 ================= */
-(async()=>{await loadPublic();render();route()})();
+(async()=>{if(await loadSite()){document.body.classList.remove('locked');render();route()}else showLock()})();
 }
 </script>
 </body>

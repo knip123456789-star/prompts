@@ -1,0 +1,11 @@
+{
+  "v": 1,
+  "wrap": {
+    "salt": "3BOd/DviUsY+hW1o2/RyNg==",
+    "iter": 600000,
+    "iv": "A5q/FFIYzoXmD/Iy",
+    "data": "DpwwKB1bvFtY5YqbTOod3+W3myCUveoZhe4Box7FSuRLmzvnCMfpS1c5RXF4E3zf"
+  },
+  "hint": "계정 생일 4자리",
+  "notice": "비밀번호 외부 공유 금지\n맞팔로워 인원만 열람"
+}
