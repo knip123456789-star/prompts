@@ -10,5 +10,24 @@
     "2인",
     "의상"
   ],
-  "items": []
+  "items": [
+    {
+      "id": "mwx4f43a2ohp",
+      "name": "너는무조건내가ㅇㅇ다",
+      "category": "짤방",
+      "memo": "V5\n눈 태그 빼야 눈감음",
+      "buttons": [
+        {
+          "kind": "prompt",
+          "label": "프롬프트",
+          "text": "1boy, solo, upper body, from side, profile, facing right, closed eyes, praying, own hands together, palms together, fingertips touching lips, head down, calm, serious, white background, simple background, photorealistic, stock photo, caption, text, korean text, A plain white rectangular caption box sits in the lower center of the image, overlapping his hands, with two lines of black text; the second line is a hashtag with an underline. The caption reads \"얼마나 오래 걸릴지는 상관없음 #너는무조건내가박는다\". Text: 얼마나 오래 걸릴지는 상관없음\n#너는무조건내가박는다"
+        }
+      ],
+      "image": "images/mwx4f43a2ohp-mwx4f43a.webp",
+      "thumb": "thumbs/mwx4f43a2ohp-mwx4f43a.webp",
+      "ratio": 0.6842,
+      "createdAt": 1795671452278,
+      "updatedAt": 1795671452278
+    }
+  ]
 }
