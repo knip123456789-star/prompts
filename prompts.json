@@ -12,6 +12,24 @@
   ],
   "items": [
     {
+      "id": "mwx4g435tcfy",
+      "name": "항상 젖어 있는 여자가",
+      "category": "짤방",
+      "memo": "V5",
+      "buttons": [
+        {
+          "kind": "prompt",
+          "label": "프롬프트",
+          "text": "1girl, solo, manga panel, monochrome, greyscale, screentone, close-up, portrait, looking at viewer, light smile, closed mouth, blush, head tilt, hand up, hand on own cheek, hand near ear, half-lidded eyes, calm, smug, speech bubble, text, korean text, A black-and-white manga panel with two white speech bubbles. One speech bubble is on the right side of her face and the other is on the left side, each with short lines of text stacked vertically and centered. The right bubble reads \"항상 젖어 있는 여자가\" and the left bubble reads \"비에 젖는 걸 두려워할 필요가 있으려나\". Text: 항상\n젖어 있는\n여자가\n\n비에\n젖는 걸\n두려워할\n필요가\n있으려나"
+        }
+      ],
+      "image": "images/mwx4g435tcfy-mwx4g435.webp",
+      "thumb": "thumbs/mwx4g435tcfy-mwx4g435.webp",
+      "ratio": 1.4615,
+      "createdAt": 1795671498929,
+      "updatedAt": 1795671498929
+    },
+    {
       "id": "mwx4f43a2ohp",
       "name": "너는무조건내가ㅇㅇ다",
       "category": "짤방",
