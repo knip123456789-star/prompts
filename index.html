@@ -384,7 +384,7 @@ function imgURL(p){
 function showLock(){
   document.body.classList.add('locked');$('#lock').hidden=false;
   const m=LOCK.meta,h=str(m.hint).trim(),n=str(m.notice).trim();
-  $('#lockHint').textContent=h?'힌트: '+h:'';$('#lockHint').hidden=!h;
+  $('#lockHint').textContent=h;$('#lockHint').hidden=!h;
   $('#lockNotice').textContent=n;$('#lockNotice').hidden=!n;
   $('#lockMsg').textContent='';$('#lockPw').value='';$('#lockPw').focus();
 }
